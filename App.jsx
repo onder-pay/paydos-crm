@@ -742,7 +742,14 @@ Paydos Turizm`;
         
         // Set data with camelCase conversion
         if (usersRes.data) setUsers(toCamelCase(usersRes.data));
-        if (customersRes.data) setCustomers(toCamelCase(customersRes.data));
+        if (customersRes.data) {
+          const customersData = toCamelCase(customersRes.data).map(c => ({
+            ...c,
+            tags: Array.isArray(c.tags) ? c.tags : (typeof c.tags === 'string' && c.tags ? c.tags.split(',').map(t => t.trim()).filter(t => t) : []),
+            activities: Array.isArray(c.activities) ? c.activities : []
+          }));
+          setCustomers(customersData);
+        }
         if (visaRes.data) setVisaApplications(toCamelCase(visaRes.data));
         if (toursRes.data) setTours(toCamelCase(toursRes.data));
         if (hotelsRes.data) setHotelReservations(toCamelCase(hotelsRes.data));
@@ -1298,7 +1305,7 @@ function CustomerModule({ customers, setCustomers, isMobile, musteriEtiketleri }
       data.forEach(row => {
         const tc = String(row['TC Kimlik'] || '').trim(); if (!tc) return;
         const existing = customers.find(c => c.tcKimlik === tc);
-        const nd = { tcKimlik: tc, firstName: row['Ad'] || '', lastName: row['Soyad'] || '', gender: row['Cinsiyet'] || '', birthDate: parseDate(row['Doğum Tarihi']), birthPlace: row['Doğum Yeri'] || '', phone: row['Telefon'] || '+905', email: row['E-posta'] || '', companyName: row['Şirket'] || '', sector: row['Sektör'] || '', position: row['Pozisyon'] || '', city: row['İkametgah Şehri'] || row['Şehir'] || '', address: row['Adres'] || '', tkMembership: row['THY'] || '', passportNo: String(row['Pasaport No'] || '').toUpperCase(), passportStart: parseDate(row['Pasaport Veriliş']), passportExpiry: parseDate(row['Pasaport Bitiş']), nationality: 'Türkiye', greenPassport: row['Yeşil Pasaport'] || 'Hayır', schengenCountry: row['Schengen Ülke'] || '', schengenVisaStart: parseDate(row['Schengen Başlangıç']), schengenVisaEnd: parseDate(row['Schengen Bitiş']), usaVisa: row['ABD Vize'] || '', usaVisaStart: parseDate(row['ABD Başlangıç']), usaVisaEnd: parseDate(row['ABD Bitiş']), notes: row['Notlar'] || '', passportDocuments1: [], passportDocuments2: [], schengenDocuments1: [], schengenDocuments2: [], schengenDocuments3: [], schengenDocuments4: [], usaDocuments: [], activities: [{ id: generateUniqueId(), type: 'customer_created', description: 'Excel ile içe aktarıldı', date: new Date().toISOString(), user: 'Admin' }], tags: row['Etiketler'] ? row['Etiketler'].split(',').map(t => t.trim()).filter(t => t) : [] };
+        const nd = { tcKimlik: tc, firstName: row['Ad'] || '', lastName: row['Soyad'] || '', gender: row['Cinsiyet'] || '', birthDate: parseDate(row['Doğum Tarihi']), birthPlace: row['Doğum Yeri'] || '', phone: row['Telefon'] || '+905', email: row['E-posta'] || '', companyName: row['Şirket'] || '', sector: row['Sektör'] || '', position: row['Pozisyon'] || '', city: row['İkametgah Şehri'] || row['Şehir'] || '', address: row['Adres'] || '', tkMembership: row['THY'] || '', passportNo: String(row['Pasaport No'] || '').toUpperCase(), passportStart: parseDate(row['Pasaport Veriliş']), passportExpiry: parseDate(row['Pasaport Bitiş']), nationality: 'Türkiye', greenPassport: row['Yeşil Pasaport'] || 'Hayır', schengenCountry: row['Schengen Ülke'] || '', schengenVisaStart: parseDate(row['Schengen Başlangıç']), schengenVisaEnd: parseDate(row['Schengen Bitiş']), usaVisa: row['ABD Vize'] || '', usaVisaStart: parseDate(row['ABD Başlangıç']), usaVisaEnd: parseDate(row['ABD Bitiş']), notes: row['Notlar'] || '', passportDocuments1: [], passportDocuments2: [], schengenDocuments1: [], schengenDocuments2: [], schengenDocuments3: [], schengenDocuments4: [], usaDocuments: [], activities: [{ id: generateUniqueId(), type: 'customer_created', description: 'Excel ile içe aktarıldı', date: new Date().toISOString(), user: 'Admin' }], tags: Array.isArray(row['Etiketler']) ? row['Etiketler'] : (typeof row['Etiketler'] === 'string' && row['Etiketler'] ? row['Etiketler'].split(',').map(t => t.trim()).filter(t => t) : []) };
         if (existing) { setCustomers(p => p.map(c => c.tcKimlik === tc ? { ...c, ...nd } : c)); updated++; }
         else { setCustomers(p => [...p, { id: generateUniqueId(), ...nd, createdAt: new Date().toISOString().split('T')[0] }]); added++; }
       });
