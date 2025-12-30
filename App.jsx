@@ -733,6 +733,14 @@ Paydos Turizm`;
   // Load data from Supabase on mount
   useEffect(() => {
     const loadData = async () => {
+      // Helper: localStorage'dan yükle
+      const ls = (key, def) => { 
+        try {
+          const s = localStorage.getItem(key); 
+          return s ? JSON.parse(s) : def; 
+        } catch { return def; }
+      };
+      
       try {
         setIsLoading(true);
         
@@ -746,19 +754,45 @@ Paydos Turizm`;
           supabase.from('settings').select('*')
         ]);
         
-        // Set data with camelCase conversion
-        if (usersRes.data) setUsers(toCamelCase(usersRes.data));
-        if (customersRes.data) {
+        // Users: Supabase > localStorage > default
+        if (usersRes.data && usersRes.data.length > 0) {
+          setUsers(toCamelCase(usersRes.data));
+        } else {
+          setUsers(ls('paydos_users', defaultUsers));
+        }
+        
+        // Customers: Supabase > localStorage > default
+        if (customersRes.data && customersRes.data.length > 0) {
           const customersData = toCamelCase(customersRes.data).map(c => ({
             ...c,
             tags: Array.isArray(c.tags) ? c.tags : (typeof c.tags === 'string' && c.tags ? c.tags.split(',').map(t => t.trim()).filter(t => t) : []),
             activities: Array.isArray(c.activities) ? c.activities : []
           }));
           setCustomers(customersData);
+        } else {
+          setCustomers(ls('paydos_customers', defaultCustomers));
         }
-        if (visaRes.data) setVisaApplications(toCamelCase(visaRes.data));
-        if (toursRes.data) setTours(toCamelCase(toursRes.data));
-        if (hotelsRes.data) setHotelReservations(toCamelCase(hotelsRes.data));
+        
+        // Visa: Supabase > localStorage > default
+        if (visaRes.data && visaRes.data.length > 0) {
+          setVisaApplications(toCamelCase(visaRes.data));
+        } else {
+          setVisaApplications(ls('paydos_visa', defaultVisaApplications));
+        }
+        
+        // Tours: Supabase > localStorage > default
+        if (toursRes.data && toursRes.data.length > 0) {
+          setTours(toCamelCase(toursRes.data));
+        } else {
+          setTours(ls('paydos_tours', defaultTours));
+        }
+        
+        // Hotels: Supabase > localStorage > default
+        if (hotelsRes.data && hotelsRes.data.length > 0) {
+          setHotelReservations(toCamelCase(hotelsRes.data));
+        } else {
+          setHotelReservations(ls('paydos_hotels', defaultHotelReservations));
+        }
         
         // Load settings
         if (settingsRes.data) {
@@ -769,11 +803,10 @@ Paydos Turizm`;
           });
         }
         
-        console.log('✅ Supabase verileri yüklendi');
+        console.log('✅ Veriler yüklendi');
       } catch (err) {
         console.error('❌ Supabase yükleme hatası:', err);
         // Fallback to localStorage
-        const ls = (key, def) => { const s = localStorage.getItem(key); return s ? JSON.parse(s) : def; };
         setUsers(ls('paydos_users', defaultUsers));
         setCustomers(ls('paydos_customers', defaultCustomers));
         setVisaApplications(ls('paydos_visa', defaultVisaApplications));
@@ -808,12 +841,14 @@ Paydos Turizm`;
   // Sync customers to Supabase
   const [syncedCustomers, setSyncedCustomers] = useState(null);
   useEffect(() => {
+    // Always backup to localStorage (skip only during initial load)
+    if (!isLoading && customers.length > 0) {
+      localStorage.setItem('paydos_customers', JSON.stringify(customers));
+    }
     if (isLoading || !syncedCustomers) {
       setSyncedCustomers(customers);
       return;
     }
-    // Always backup to localStorage first
-    localStorage.setItem('paydos_customers', JSON.stringify(customers));
     // Find changes
     const syncChanges = async () => {
       try {
@@ -852,12 +887,14 @@ Paydos Turizm`;
   // Sync visa applications to Supabase
   const [syncedVisa, setSyncedVisa] = useState(null);
   useEffect(() => {
+    // Always backup to localStorage (skip only during initial load)
+    if (!isLoading && visaApplications.length > 0) {
+      localStorage.setItem('paydos_visa', JSON.stringify(visaApplications));
+    }
     if (isLoading || !syncedVisa) {
       setSyncedVisa(visaApplications);
       return;
     }
-    // Always backup to localStorage first
-    localStorage.setItem('paydos_visa', JSON.stringify(visaApplications));
     const syncChanges = async () => {
       try {
         const newItems = visaApplications.filter(v => !syncedVisa.find(sv => sv.id === v.id));
@@ -892,12 +929,14 @@ Paydos Turizm`;
   // Sync users to Supabase
   const [syncedUsers, setSyncedUsers] = useState(null);
   useEffect(() => {
+    // Always backup to localStorage (skip only during initial load)
+    if (!isLoading && users.length > 0) {
+      localStorage.setItem('paydos_users', JSON.stringify(users));
+    }
     if (isLoading || !syncedUsers) {
       setSyncedUsers(users);
       return;
     }
-    // Always backup to localStorage first
-    localStorage.setItem('paydos_users', JSON.stringify(users));
     const syncChanges = async () => {
       try {
         const newItems = users.filter(u => !syncedUsers.find(su => su.id === u.id));
@@ -931,12 +970,14 @@ Paydos Turizm`;
   // Sync tours to Supabase
   const [syncedTours, setSyncedTours] = useState(null);
   useEffect(() => {
+    // Always backup to localStorage (skip only during initial load)
+    if (!isLoading && tours.length > 0) {
+      localStorage.setItem('paydos_tours', JSON.stringify(tours));
+    }
     if (isLoading || !syncedTours) {
       setSyncedTours(tours);
       return;
     }
-    // Always backup to localStorage first
-    localStorage.setItem('paydos_tours', JSON.stringify(tours));
     const syncChanges = async () => {
       try {
         const newItems = tours.filter(t => !syncedTours.find(st => st.id === t.id));
@@ -970,12 +1011,14 @@ Paydos Turizm`;
   // Sync hotel reservations to Supabase
   const [syncedHotels, setSyncedHotels] = useState(null);
   useEffect(() => {
+    // Always backup to localStorage (skip only during initial load)
+    if (!isLoading && hotelReservations.length > 0) {
+      localStorage.setItem('paydos_hotels', JSON.stringify(hotelReservations));
+    }
     if (isLoading || !syncedHotels) {
       setSyncedHotels(hotelReservations);
       return;
     }
-    // Always backup to localStorage first
-    localStorage.setItem('paydos_hotels', JSON.stringify(hotelReservations));
     const syncChanges = async () => {
       try {
         const newItems = hotelReservations.filter(h => !syncedHotels.find(sh => sh.id === h.id));
