@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import { supabase, toCamelCase, toSnakeCase } from './lib/supabase';
 
-// localStorage helper fonksiyonları
+// localStorage helper fonksiyonları (yedek olarak)
 const storage = {
   get: (key, defaultVal) => {
     try {
@@ -752,24 +753,182 @@ Paydos Turizm`;
   // Default değerler
   const defaultFirmalar = ['Paydos', 'RBN', 'Oğuz', 'İ Data', 'İ Data Mobil', 'Oğuzhan İst.'];
 
-  // Load data on mount - localStorage'dan yükle
+  // Load data on mount - Supabase'den yükle
   useEffect(() => {
-    setIsLoading(true);
+    const loadData = async () => {
+      setIsLoading(true);
+      
+      try {
+        // Supabase'den verileri çek
+        const [usersRes, customersRes, visaRes, toursRes, hotelsRes, settingsRes] = await Promise.all([
+          supabase.from('users').select('*'),
+          supabase.from('customers').select('*').order('created_at', { ascending: false }),
+          supabase.from('visa_applications').select('*').order('created_at', { ascending: false }),
+          supabase.from('tours').select('*').order('created_at', { ascending: false }),
+          supabase.from('hotel_reservations').select('*').order('created_at', { ascending: false }),
+          supabase.from('settings').select('*')
+        ]);
+
+        // Verileri state'e yükle
+        if (usersRes.data?.length > 0) {
+          setUsers(toCamelCase(usersRes.data));
+        } else {
+          setUsers(defaultUsers);
+        }
+
+        if (customersRes.data?.length > 0) {
+          const customersData = toCamelCase(customersRes.data).map(c => ({
+            ...c,
+            tags: Array.isArray(c.tags) ? c.tags : [],
+            activities: Array.isArray(c.activities) ? c.activities : []
+          }));
+          setCustomers(customersData);
+        } else {
+          setCustomers(storage.get('customers', defaultCustomers));
+        }
+
+        if (visaRes.data?.length > 0) {
+          setVisaApplications(toCamelCase(visaRes.data));
+        } else {
+          setVisaApplications(storage.get('visa', defaultVisaApplications));
+        }
+
+        if (toursRes.data?.length > 0) {
+          setTours(toCamelCase(toursRes.data));
+        } else {
+          setTours(storage.get('tours', defaultTours));
+        }
+
+        if (hotelsRes.data?.length > 0) {
+          setHotelReservations(toCamelCase(hotelsRes.data));
+        } else {
+          setHotelReservations(storage.get('hotels', defaultHotelReservations));
+        }
+
+        // Ayarları yükle
+        if (settingsRes.data) {
+          settingsRes.data.forEach(s => {
+            if (s.key === 'firmalar' && s.value) setIslemFirmalari(s.value);
+            if (s.key === 'etiketler' && s.value) setMusteriEtiketleri(s.value);
+            if (s.key === 'whatsapp_mesajlar' && s.value) setWhatsappMesajlar(s.value);
+          });
+        }
+
+        console.log('✅ Veriler Supabase\'den yüklendi');
+      } catch (err) {
+        console.error('❌ Supabase hatası, localStorage kullanılıyor:', err);
+        // Fallback to localStorage
+        setUsers(storage.get('users', defaultUsers));
+        setCustomers(storage.get('customers', defaultCustomers));
+        setVisaApplications(storage.get('visa', defaultVisaApplications));
+        setTours(storage.get('tours', defaultTours));
+        setHotelReservations(storage.get('hotels', defaultHotelReservations));
+        setIslemFirmalari(storage.get('firmalar', defaultFirmalar));
+        setMusteriEtiketleri(storage.get('etiketler', defaultEtiketler));
+      }
+      
+      setIsLoading(false);
+    };
     
-    // localStorage'dan yükle
-    setUsers(storage.get('users', defaultUsers));
-    setCustomers(storage.get('customers', defaultCustomers));
-    setVisaApplications(storage.get('visa', defaultVisaApplications));
-    setTours(storage.get('tours', defaultTours));
-    setHotelReservations(storage.get('hotels', defaultHotelReservations));
-    setIslemFirmalari(storage.get('firmalar', defaultFirmalar));
-    setMusteriEtiketleri(storage.get('etiketler', defaultEtiketler));
-    
-    setIsLoading(false);
-    console.log('✅ Veriler localStorage\'dan yüklendi');
+    loadData();
   }, []);
 
-  // Auto-save to localStorage when data changes
+  // Supabase'e kaydet - Customers
+  const saveCustomerToSupabase = async (customer, isNew = false) => {
+    try {
+      const snakeData = toSnakeCase(customer);
+      if (isNew) {
+        delete snakeData.id;
+        const { data, error } = await supabase.from('customers').insert([snakeData]).select();
+        if (error) throw error;
+        return data?.[0];
+      } else {
+        snakeData.updated_at = new Date().toISOString();
+        const { error } = await supabase.from('customers').update(snakeData).eq('id', customer.id);
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Müşteri kaydetme hatası:', err);
+    }
+  };
+
+  // Supabase'e kaydet - Visa
+  const saveVisaToSupabase = async (visa, isNew = false) => {
+    try {
+      const snakeData = toSnakeCase(visa);
+      if (isNew) {
+        delete snakeData.id;
+        const { data, error } = await supabase.from('visa_applications').insert([snakeData]).select();
+        if (error) throw error;
+        return data?.[0];
+      } else {
+        snakeData.updated_at = new Date().toISOString();
+        const { error } = await supabase.from('visa_applications').update(snakeData).eq('id', visa.id);
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Vize kaydetme hatası:', err);
+    }
+  };
+
+  // Supabase'e kaydet - Tours
+  const saveTourToSupabase = async (tour, isNew = false) => {
+    try {
+      const snakeData = toSnakeCase(tour);
+      if (isNew) {
+        delete snakeData.id;
+        const { data, error } = await supabase.from('tours').insert([snakeData]).select();
+        if (error) throw error;
+        return data?.[0];
+      } else {
+        snakeData.updated_at = new Date().toISOString();
+        const { error } = await supabase.from('tours').update(snakeData).eq('id', tour.id);
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Tur kaydetme hatası:', err);
+    }
+  };
+
+  // Supabase'e kaydet - Hotels
+  const saveHotelToSupabase = async (hotel, isNew = false) => {
+    try {
+      const snakeData = toSnakeCase(hotel);
+      if (isNew) {
+        delete snakeData.id;
+        const { data, error } = await supabase.from('hotel_reservations').insert([snakeData]).select();
+        if (error) throw error;
+        return data?.[0];
+      } else {
+        snakeData.updated_at = new Date().toISOString();
+        const { error } = await supabase.from('hotel_reservations').update(snakeData).eq('id', hotel.id);
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Otel kaydetme hatası:', err);
+    }
+  };
+
+  // Supabase'den sil
+  const deleteFromSupabase = async (table, id) => {
+    try {
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error(`${table} silme hatası:`, err);
+    }
+  };
+
+  // Ayarları Supabase'e kaydet
+  const saveSettingsToSupabase = async (key, value) => {
+    try {
+      await supabase.from('settings').upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    } catch (err) {
+      console.error('Ayar kaydetme hatası:', err);
+    }
+  };
+
+  // Auto-save to localStorage (backup) when data changes
   useEffect(() => {
     if (!isLoading) storage.set('customers', customers);
   }, [customers, isLoading]);
@@ -791,11 +950,17 @@ Paydos Turizm`;
   }, [hotelReservations, isLoading]);
   
   useEffect(() => {
-    if (!isLoading) storage.set('firmalar', islemFirmalari);
+    if (!isLoading) {
+      storage.set('firmalar', islemFirmalari);
+      saveSettingsToSupabase('firmalar', islemFirmalari);
+    }
   }, [islemFirmalari, isLoading]);
   
   useEffect(() => {
-    if (!isLoading) storage.set('etiketler', musteriEtiketleri);
+    if (!isLoading) {
+      storage.set('etiketler', musteriEtiketleri);
+      saveSettingsToSupabase('etiketler', musteriEtiketleri);
+    }
   }, [musteriEtiketleri, isLoading]);
 
   // Window resize handler
