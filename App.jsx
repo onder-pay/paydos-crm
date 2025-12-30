@@ -770,6 +770,8 @@ Paydos Turizm`;
         ]);
 
         // Verileri state'e yükle
+        console.log('Supabase response:', { users: usersRes, customers: customersRes, visa: visaRes });
+        
         if (usersRes.data?.length > 0) {
           setUsers(toCamelCase(usersRes.data));
         } else {
@@ -783,7 +785,9 @@ Paydos Turizm`;
             activities: Array.isArray(c.activities) ? c.activities : []
           }));
           setCustomers(customersData);
+          console.log('✅ Müşteriler yüklendi:', customersData.length);
         } else {
+          console.log('⚠️ Supabase boş, localStorage kullanılıyor');
           setCustomers(storage.get('customers', defaultCustomers));
         }
 
@@ -816,7 +820,8 @@ Paydos Turizm`;
 
         console.log('✅ Veriler Supabase\'den yüklendi');
       } catch (err) {
-        console.error('❌ Supabase hatası, localStorage kullanılıyor:', err);
+        console.error('❌ Supabase hatası:', err);
+        alert('Supabase hatası: ' + (err?.message || JSON.stringify(err)));
         // Fallback to localStorage
         setUsers(storage.get('users', defaultUsers));
         setCustomers(storage.get('customers', defaultCustomers));
@@ -928,26 +933,200 @@ Paydos Turizm`;
     }
   };
 
-  // Auto-save to localStorage (backup) when data changes
+  // Supabase sync için önceki değerleri tut
+  const prevCustomersRef = useRef(null);
+  const prevVisaRef = useRef(null);
+  const prevToursRef = useRef(null);
+  const prevHotelsRef = useRef(null);
+
+  // Auto-save customers to Supabase
   useEffect(() => {
-    if (!isLoading) storage.set('customers', customers);
+    if (isLoading || !prevCustomersRef.current) {
+      prevCustomersRef.current = customers;
+      return;
+    }
+    storage.set('customers', customers);
+    
+    // Sync to Supabase
+    const syncCustomers = async () => {
+      const prev = prevCustomersRef.current;
+      
+      // Yeni eklenenler
+      for (const c of customers) {
+        const existed = prev.find(p => p.id === c.id);
+        if (!existed) {
+          const snakeData = toSnakeCase({ ...c });
+          delete snakeData.id;
+          try {
+            const { data } = await supabase.from('customers').insert([snakeData]).select();
+            if (data?.[0]) {
+              // ID'yi güncelle
+              setCustomers(curr => curr.map(x => x.id === c.id ? { ...x, id: data[0].id } : x));
+            }
+          } catch (e) { console.error('Insert hatası:', e); }
+        } else if (JSON.stringify(existed) !== JSON.stringify(c)) {
+          // Güncellenenler
+          const snakeData = toSnakeCase({ ...c, updatedAt: new Date().toISOString() });
+          try {
+            await supabase.from('customers').update(snakeData).eq('id', c.id);
+          } catch (e) { console.error('Update hatası:', e); }
+        }
+      }
+      
+      // Silinenler
+      for (const p of prev) {
+        if (!customers.find(c => c.id === p.id)) {
+          try {
+            await supabase.from('customers').delete().eq('id', p.id);
+          } catch (e) { console.error('Delete hatası:', e); }
+        }
+      }
+      
+      prevCustomersRef.current = customers;
+    };
+    
+    const timer = setTimeout(syncCustomers, 500);
+    return () => clearTimeout(timer);
   }, [customers, isLoading]);
-  
+
+  // Auto-save visa to Supabase
   useEffect(() => {
-    if (!isLoading) storage.set('visa', visaApplications);
+    if (isLoading || !prevVisaRef.current) {
+      prevVisaRef.current = visaApplications;
+      return;
+    }
+    storage.set('visa', visaApplications);
+    
+    const syncVisa = async () => {
+      const prev = prevVisaRef.current;
+      
+      for (const v of visaApplications) {
+        const existed = prev.find(p => p.id === v.id);
+        if (!existed) {
+          const snakeData = toSnakeCase({ ...v });
+          delete snakeData.id;
+          try {
+            const { data } = await supabase.from('visa_applications').insert([snakeData]).select();
+            if (data?.[0]) {
+              setVisaApplications(curr => curr.map(x => x.id === v.id ? { ...x, id: data[0].id } : x));
+            }
+          } catch (e) { console.error('Visa insert hatası:', e); }
+        } else if (JSON.stringify(existed) !== JSON.stringify(v)) {
+          const snakeData = toSnakeCase({ ...v, updatedAt: new Date().toISOString() });
+          try {
+            await supabase.from('visa_applications').update(snakeData).eq('id', v.id);
+          } catch (e) { console.error('Visa update hatası:', e); }
+        }
+      }
+      
+      for (const p of prev) {
+        if (!visaApplications.find(v => v.id === p.id)) {
+          try {
+            await supabase.from('visa_applications').delete().eq('id', p.id);
+          } catch (e) { console.error('Visa delete hatası:', e); }
+        }
+      }
+      
+      prevVisaRef.current = visaApplications;
+    };
+    
+    const timer = setTimeout(syncVisa, 500);
+    return () => clearTimeout(timer);
   }, [visaApplications, isLoading]);
+
+  // Auto-save tours to Supabase
+  useEffect(() => {
+    if (isLoading || !prevToursRef.current) {
+      prevToursRef.current = tours;
+      return;
+    }
+    storage.set('tours', tours);
+    
+    const syncTours = async () => {
+      const prev = prevToursRef.current;
+      
+      for (const t of tours) {
+        const existed = prev.find(p => p.id === t.id);
+        if (!existed) {
+          const snakeData = toSnakeCase({ ...t });
+          delete snakeData.id;
+          try {
+            const { data } = await supabase.from('tours').insert([snakeData]).select();
+            if (data?.[0]) {
+              setTours(curr => curr.map(x => x.id === t.id ? { ...x, id: data[0].id } : x));
+            }
+          } catch (e) { console.error('Tour insert hatası:', e); }
+        } else if (JSON.stringify(existed) !== JSON.stringify(t)) {
+          const snakeData = toSnakeCase({ ...t, updatedAt: new Date().toISOString() });
+          try {
+            await supabase.from('tours').update(snakeData).eq('id', t.id);
+          } catch (e) { console.error('Tour update hatası:', e); }
+        }
+      }
+      
+      for (const p of prev) {
+        if (!tours.find(t => t.id === p.id)) {
+          try {
+            await supabase.from('tours').delete().eq('id', p.id);
+          } catch (e) { console.error('Tour delete hatası:', e); }
+        }
+      }
+      
+      prevToursRef.current = tours;
+    };
+    
+    const timer = setTimeout(syncTours, 500);
+    return () => clearTimeout(timer);
+  }, [tours, isLoading]);
+
+  // Auto-save hotels to Supabase
+  useEffect(() => {
+    if (isLoading || !prevHotelsRef.current) {
+      prevHotelsRef.current = hotelReservations;
+      return;
+    }
+    storage.set('hotels', hotelReservations);
+    
+    const syncHotels = async () => {
+      const prev = prevHotelsRef.current;
+      
+      for (const h of hotelReservations) {
+        const existed = prev.find(p => p.id === h.id);
+        if (!existed) {
+          const snakeData = toSnakeCase({ ...h });
+          delete snakeData.id;
+          try {
+            const { data } = await supabase.from('hotel_reservations').insert([snakeData]).select();
+            if (data?.[0]) {
+              setHotelReservations(curr => curr.map(x => x.id === h.id ? { ...x, id: data[0].id } : x));
+            }
+          } catch (e) { console.error('Hotel insert hatası:', e); }
+        } else if (JSON.stringify(existed) !== JSON.stringify(h)) {
+          const snakeData = toSnakeCase({ ...h, updatedAt: new Date().toISOString() });
+          try {
+            await supabase.from('hotel_reservations').update(snakeData).eq('id', h.id);
+          } catch (e) { console.error('Hotel update hatası:', e); }
+        }
+      }
+      
+      for (const p of prev) {
+        if (!hotelReservations.find(h => h.id === p.id)) {
+          try {
+            await supabase.from('hotel_reservations').delete().eq('id', p.id);
+          } catch (e) { console.error('Hotel delete hatası:', e); }
+        }
+      }
+      
+      prevHotelsRef.current = hotelReservations;
+    };
+    
+    const timer = setTimeout(syncHotels, 500);
+    return () => clearTimeout(timer);
+  }, [hotelReservations, isLoading]);
   
   useEffect(() => {
     if (!isLoading) storage.set('users', users);
   }, [users, isLoading]);
-  
-  useEffect(() => {
-    if (!isLoading) storage.set('tours', tours);
-  }, [tours, isLoading]);
-  
-  useEffect(() => {
-    if (!isLoading) storage.set('hotels', hotelReservations);
-  }, [hotelReservations, isLoading]);
   
   useEffect(() => {
     if (!isLoading) {
