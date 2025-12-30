@@ -1,6 +1,25 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { supabase, toCamelCase, toSnakeCase } from './lib/supabase';
+
+// localStorage helper fonksiyonları
+const storage = {
+  get: (key, defaultVal) => {
+    try {
+      const item = localStorage.getItem(`paydos_${key}`);
+      return item ? JSON.parse(item) : defaultVal;
+    } catch {
+      return defaultVal;
+    }
+  },
+  set: (key, value) => {
+    try {
+      localStorage.setItem(`paydos_${key}`, JSON.stringify(value));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+};
 
 const defaultCustomers = [
   { id: 1, tcKimlik: '12345678901', firstName: 'Ahmet', lastName: 'Yılmaz', gender: 'Erkek', birthDate: '1985-03-15', birthPlace: 'Manisa', companyName: 'Yılmaz Tekstil', sector: 'Tekstil', position: 'Müdür', city: 'İzmir', phone: '+905321234567', email: 'ahmet@email.com', address: 'Alsancak No:45', tkMembership: 'TK123456789', passportNo: 'U12345678', passportStart: '2020-03-15', passportExpiry: '2026-03-15', nationality: 'Türkiye', passportDocuments1: [], passportDocuments2: [], greenPassport: 'Hayır', schengenCountry: 'Almanya', schengenVisaStart: '2025-06-20', schengenVisaEnd: '2026-01-10', schengenDocuments1: [], schengenDocuments2: [], schengenDocuments3: [], schengenDocuments4: [], usaVisa: 'Var', usaVisaStart: '2023-05-01', usaVisaEnd: '2033-05-01', usaDocuments: [], notes: 'VIP', createdAt: '2024-01-15', activities: [{ id: 1, type: 'customer_created', description: 'Müşteri kaydı oluşturuldu', date: '2024-01-15T10:00:00', user: 'Admin' }, { id: 2, type: 'visa_created', description: 'Almanya Schengen vize başvurusu oluşturuldu', date: '2025-12-01T14:30:00', user: 'Admin' }], tags: ['VIP', 'Kurumsal'] },
@@ -730,324 +749,51 @@ export default function App() {
 Paydos Turizm`;
   const [whatsappMesajlar, setWhatsappMesajlar] = useState({ schengen: defaultWhatsappMesaj, usa: defaultWhatsappMesaj, uk: defaultWhatsappMesaj, russia: defaultWhatsappMesaj, uae: defaultWhatsappMesaj, china: defaultWhatsappMesaj });
 
-  // Load data from Supabase on mount
+  // Load data on mount - localStorage'dan yükle
   useEffect(() => {
-    const loadData = async () => {
-      // Helper: localStorage'dan yükle
-      const ls = (key, def) => { 
-        try {
-          const s = localStorage.getItem(key); 
-          return s ? JSON.parse(s) : def; 
-        } catch { return def; }
-      };
-      
-      try {
-        setIsLoading(true);
-        
-        // Fetch all data in parallel
-        const [usersRes, customersRes, visaRes, toursRes, hotelsRes, settingsRes] = await Promise.all([
-          supabase.from('users').select('*'),
-          supabase.from('customers').select('*').order('created_at', { ascending: false }),
-          supabase.from('visa_applications').select('*').order('created_at', { ascending: false }),
-          supabase.from('tours').select('*').order('created_at', { ascending: false }),
-          supabase.from('hotel_reservations').select('*').order('created_at', { ascending: false }),
-          supabase.from('settings').select('*')
-        ]);
-        
-        // Users: Supabase > localStorage > default
-        if (usersRes.data && usersRes.data.length > 0) {
-          setUsers(toCamelCase(usersRes.data));
-        } else {
-          setUsers(ls('paydos_users', defaultUsers));
-        }
-        
-        // Customers: Supabase > localStorage > default
-        if (customersRes.data && customersRes.data.length > 0) {
-          const customersData = toCamelCase(customersRes.data).map(c => ({
-            ...c,
-            tags: Array.isArray(c.tags) ? c.tags : (typeof c.tags === 'string' && c.tags ? c.tags.split(',').map(t => t.trim()).filter(t => t) : []),
-            activities: Array.isArray(c.activities) ? c.activities : []
-          }));
-          setCustomers(customersData);
-        } else {
-          setCustomers(ls('paydos_customers', defaultCustomers));
-        }
-        
-        // Visa: Supabase > localStorage > default
-        if (visaRes.data && visaRes.data.length > 0) {
-          setVisaApplications(toCamelCase(visaRes.data));
-        } else {
-          setVisaApplications(ls('paydos_visa', defaultVisaApplications));
-        }
-        
-        // Tours: Supabase > localStorage > default
-        if (toursRes.data && toursRes.data.length > 0) {
-          setTours(toCamelCase(toursRes.data));
-        } else {
-          setTours(ls('paydos_tours', defaultTours));
-        }
-        
-        // Hotels: Supabase > localStorage > default
-        if (hotelsRes.data && hotelsRes.data.length > 0) {
-          setHotelReservations(toCamelCase(hotelsRes.data));
-        } else {
-          setHotelReservations(ls('paydos_hotels', defaultHotelReservations));
-        }
-        
-        // Load settings
-        if (settingsRes.data) {
-          settingsRes.data.forEach(s => {
-            if (s.key === 'firmalar' && s.value) setIslemFirmalari(s.value);
-            if (s.key === 'etiketler' && s.value) setMusteriEtiketleri(s.value);
-            if (s.key === 'whatsapp_mesajlar' && s.value) setWhatsappMesajlar(s.value);
-          });
-        }
-        
-        console.log('✅ Veriler yüklendi');
-      } catch (err) {
-        console.error('❌ Supabase yükleme hatası:', err);
-        // Fallback to localStorage
-        setUsers(ls('paydos_users', defaultUsers));
-        setCustomers(ls('paydos_customers', defaultCustomers));
-        setVisaApplications(ls('paydos_visa', defaultVisaApplications));
-        setTours(ls('paydos_tours', defaultTours));
-        setHotelReservations(ls('paydos_hotels', defaultHotelReservations));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadData();
+    setIsLoading(true);
+    
+    // localStorage'dan yükle
+    setUsers(storage.get('users', defaultUsers));
+    setCustomers(storage.get('customers', defaultCustomers));
+    setVisaApplications(storage.get('visa', defaultVisaApplications));
+    setTours(storage.get('tours', defaultTours));
+    setHotelReservations(storage.get('hotels', defaultHotelReservations));
+    setIslemFirmalari(storage.get('firmalar', defaultIslemFirmalari));
+    setMusteriEtiketleri(storage.get('etiketler', defaultMusteriEtiketleri));
+    
+    setIsLoading(false);
+    console.log('✅ Veriler localStorage\'dan yüklendi');
   }, []);
 
-  // Auto-save to Supabase when data changes (debounced)
-  const saveToSupabase = useCallback(async (table, data) => {
-    try {
-      // For settings, use upsert
-      if (['firmalar', 'etiketler', 'whatsapp_mesajlar'].includes(table)) {
-        await supabase.from('settings').upsert({ key: table, value: data, updated_at: new Date().toISOString() }, { onConflict: 'key' });
-      }
-      // Also save to localStorage as backup
-      localStorage.setItem(`paydos_${table}`, JSON.stringify(data));
-    } catch (err) {
-      console.error(`Kaydetme hatası (${table}):`, err);
-    }
-  }, []);
-
-  // Save settings to Supabase when they change
-  useEffect(() => { if (!isLoading) saveToSupabase('firmalar', islemFirmalari); }, [islemFirmalari, isLoading]);
-  useEffect(() => { if (!isLoading) saveToSupabase('etiketler', musteriEtiketleri); }, [musteriEtiketleri, isLoading]);
-  useEffect(() => { if (!isLoading) saveToSupabase('whatsapp_mesajlar', whatsappMesajlar); }, [whatsappMesajlar, isLoading]);
-
-  // Sync customers to Supabase
-  const [syncedCustomers, setSyncedCustomers] = useState(null);
+  // Auto-save to localStorage when data changes
   useEffect(() => {
-    // Always backup to localStorage (skip only during initial load)
-    if (!isLoading && customers.length > 0) {
-      localStorage.setItem('paydos_customers', JSON.stringify(customers));
-    }
-    if (isLoading || !syncedCustomers) {
-      setSyncedCustomers(customers);
-      return;
-    }
-    // Find changes
-    const syncChanges = async () => {
-      try {
-        // New items
-        const newItems = customers.filter(c => !syncedCustomers.find(sc => sc.id === c.id));
-        for (const item of newItems) {
-          if (!item.id || typeof item.id === 'number') {
-            const snakeItem = toSnakeCase(item);
-            delete snakeItem.id;
-            await supabase.from('customers').insert([snakeItem]);
-          }
-        }
-        // Deleted items
-        const deletedIds = syncedCustomers.filter(sc => !customers.find(c => c.id === sc.id)).map(d => d.id);
-        if (deletedIds.length > 0) {
-          await supabase.from('customers').delete().in('id', deletedIds);
-        }
-        // Updated items (simplified - update all changed)
-        for (const item of customers) {
-          const synced = syncedCustomers.find(s => s.id === item.id);
-          if (synced && JSON.stringify(synced) !== JSON.stringify(item)) {
-            const snakeItem = toSnakeCase(item);
-            snakeItem.updated_at = new Date().toISOString();
-            await supabase.from('customers').update(snakeItem).eq('id', item.id);
-          }
-        }
-        setSyncedCustomers(customers);
-      } catch (err) {
-        console.error('Müşteri sync hatası:', err);
-      }
-    };
-    const timeout = setTimeout(syncChanges, 500); // Debounce
-    return () => clearTimeout(timeout);
+    if (!isLoading) storage.set('customers', customers);
   }, [customers, isLoading]);
-
-  // Sync visa applications to Supabase
-  const [syncedVisa, setSyncedVisa] = useState(null);
+  
   useEffect(() => {
-    // Always backup to localStorage (skip only during initial load)
-    if (!isLoading && visaApplications.length > 0) {
-      localStorage.setItem('paydos_visa', JSON.stringify(visaApplications));
-    }
-    if (isLoading || !syncedVisa) {
-      setSyncedVisa(visaApplications);
-      return;
-    }
-    const syncChanges = async () => {
-      try {
-        const newItems = visaApplications.filter(v => !syncedVisa.find(sv => sv.id === v.id));
-        for (const item of newItems) {
-          if (!item.id || typeof item.id === 'number') {
-            const snakeItem = toSnakeCase(item);
-            delete snakeItem.id;
-            await supabase.from('visa_applications').insert([snakeItem]);
-          }
-        }
-        const deletedIds = syncedVisa.filter(sv => !visaApplications.find(v => v.id === sv.id)).map(d => d.id);
-        if (deletedIds.length > 0) {
-          await supabase.from('visa_applications').delete().in('id', deletedIds);
-        }
-        for (const item of visaApplications) {
-          const synced = syncedVisa.find(s => s.id === item.id);
-          if (synced && JSON.stringify(synced) !== JSON.stringify(item)) {
-            const snakeItem = toSnakeCase(item);
-            snakeItem.updated_at = new Date().toISOString();
-            await supabase.from('visa_applications').update(snakeItem).eq('id', item.id);
-          }
-        }
-        setSyncedVisa(visaApplications);
-      } catch (err) {
-        console.error('Vize sync hatası:', err);
-      }
-    };
-    const timeout = setTimeout(syncChanges, 500);
-    return () => clearTimeout(timeout);
+    if (!isLoading) storage.set('visa', visaApplications);
   }, [visaApplications, isLoading]);
-
-  // Sync users to Supabase
-  const [syncedUsers, setSyncedUsers] = useState(null);
+  
   useEffect(() => {
-    // Always backup to localStorage (skip only during initial load)
-    if (!isLoading && users.length > 0) {
-      localStorage.setItem('paydos_users', JSON.stringify(users));
-    }
-    if (isLoading || !syncedUsers) {
-      setSyncedUsers(users);
-      return;
-    }
-    const syncChanges = async () => {
-      try {
-        const newItems = users.filter(u => !syncedUsers.find(su => su.id === u.id));
-        for (const item of newItems) {
-          if (!item.id || typeof item.id === 'number') {
-            const snakeItem = toSnakeCase(item);
-            delete snakeItem.id;
-            await supabase.from('users').insert([snakeItem]);
-          }
-        }
-        const deletedIds = syncedUsers.filter(su => !users.find(u => u.id === su.id)).map(d => d.id);
-        if (deletedIds.length > 0) {
-          await supabase.from('users').delete().in('id', deletedIds);
-        }
-        for (const item of users) {
-          const synced = syncedUsers.find(s => s.id === item.id);
-          if (synced && JSON.stringify(synced) !== JSON.stringify(item)) {
-            const snakeItem = toSnakeCase(item);
-            await supabase.from('users').update(snakeItem).eq('id', item.id);
-          }
-        }
-        setSyncedUsers(users);
-      } catch (err) {
-        console.error('User sync hatası:', err);
-      }
-    };
-    const timeout = setTimeout(syncChanges, 500);
-    return () => clearTimeout(timeout);
+    if (!isLoading) storage.set('users', users);
   }, [users, isLoading]);
-
-  // Sync tours to Supabase
-  const [syncedTours, setSyncedTours] = useState(null);
+  
   useEffect(() => {
-    // Always backup to localStorage (skip only during initial load)
-    if (!isLoading && tours.length > 0) {
-      localStorage.setItem('paydos_tours', JSON.stringify(tours));
-    }
-    if (isLoading || !syncedTours) {
-      setSyncedTours(tours);
-      return;
-    }
-    const syncChanges = async () => {
-      try {
-        const newItems = tours.filter(t => !syncedTours.find(st => st.id === t.id));
-        for (const item of newItems) {
-          if (!item.id || typeof item.id === 'number') {
-            const snakeItem = toSnakeCase(item);
-            delete snakeItem.id;
-            await supabase.from('tours').insert([snakeItem]);
-          }
-        }
-        const deletedIds = syncedTours.filter(st => !tours.find(t => t.id === st.id)).map(d => d.id);
-        if (deletedIds.length > 0) {
-          await supabase.from('tours').delete().in('id', deletedIds);
-        }
-        for (const item of tours) {
-          const synced = syncedTours.find(s => s.id === item.id);
-          if (synced && JSON.stringify(synced) !== JSON.stringify(item)) {
-            const snakeItem = toSnakeCase(item);
-            await supabase.from('tours').update(snakeItem).eq('id', item.id);
-          }
-        }
-        setSyncedTours(tours);
-      } catch (err) {
-        console.error('Tour sync hatası:', err);
-      }
-    };
-    const timeout = setTimeout(syncChanges, 500);
-    return () => clearTimeout(timeout);
+    if (!isLoading) storage.set('tours', tours);
   }, [tours, isLoading]);
-
-  // Sync hotel reservations to Supabase
-  const [syncedHotels, setSyncedHotels] = useState(null);
+  
   useEffect(() => {
-    // Always backup to localStorage (skip only during initial load)
-    if (!isLoading && hotelReservations.length > 0) {
-      localStorage.setItem('paydos_hotels', JSON.stringify(hotelReservations));
-    }
-    if (isLoading || !syncedHotels) {
-      setSyncedHotels(hotelReservations);
-      return;
-    }
-    const syncChanges = async () => {
-      try {
-        const newItems = hotelReservations.filter(h => !syncedHotels.find(sh => sh.id === h.id));
-        for (const item of newItems) {
-          if (!item.id || typeof item.id === 'number') {
-            const snakeItem = toSnakeCase(item);
-            delete snakeItem.id;
-            await supabase.from('hotel_reservations').insert([snakeItem]);
-          }
-        }
-        const deletedIds = syncedHotels.filter(sh => !hotelReservations.find(h => h.id === sh.id)).map(d => d.id);
-        if (deletedIds.length > 0) {
-          await supabase.from('hotel_reservations').delete().in('id', deletedIds);
-        }
-        for (const item of hotelReservations) {
-          const synced = syncedHotels.find(s => s.id === item.id);
-          if (synced && JSON.stringify(synced) !== JSON.stringify(item)) {
-            const snakeItem = toSnakeCase(item);
-            await supabase.from('hotel_reservations').update(snakeItem).eq('id', item.id);
-          }
-        }
-        setSyncedHotels(hotelReservations);
-      } catch (err) {
-        console.error('Hotel sync hatası:', err);
-      }
-    };
-    const timeout = setTimeout(syncChanges, 500);
-    return () => clearTimeout(timeout);
+    if (!isLoading) storage.set('hotels', hotelReservations);
   }, [hotelReservations, isLoading]);
+  
+  useEffect(() => {
+    if (!isLoading) storage.set('firmalar', islemFirmalari);
+  }, [islemFirmalari, isLoading]);
+  
+  useEffect(() => {
+    if (!isLoading) storage.set('etiketler', musteriEtiketleri);
+  }, [musteriEtiketleri, isLoading]);
 
   // Window resize handler
   useEffect(() => { const h = () => { setIsMobile(window.innerWidth < 1024); if (window.innerWidth < 1024) setSidebarOpen(false); }; window.addEventListener('resize', h); if (window.innerWidth < 1024) setSidebarOpen(false); return () => window.removeEventListener('resize', h); }, []);
