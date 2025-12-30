@@ -749,6 +749,9 @@ export default function App() {
 Paydos Turizm`;
   const [whatsappMesajlar, setWhatsappMesajlar] = useState({ schengen: defaultWhatsappMesaj, usa: defaultWhatsappMesaj, uk: defaultWhatsappMesaj, russia: defaultWhatsappMesaj, uae: defaultWhatsappMesaj, china: defaultWhatsappMesaj });
 
+  // Default değerler
+  const defaultFirmalar = ['Paydos', 'RBN', 'Oğuz', 'İ Data', 'İ Data Mobil', 'Oğuzhan İst.'];
+
   // Load data on mount - localStorage'dan yükle
   useEffect(() => {
     setIsLoading(true);
@@ -759,8 +762,8 @@ Paydos Turizm`;
     setVisaApplications(storage.get('visa', defaultVisaApplications));
     setTours(storage.get('tours', defaultTours));
     setHotelReservations(storage.get('hotels', defaultHotelReservations));
-    setIslemFirmalari(storage.get('firmalar', defaultIslemFirmalari));
-    setMusteriEtiketleri(storage.get('etiketler', defaultMusteriEtiketleri));
+    setIslemFirmalari(storage.get('firmalar', defaultFirmalar));
+    setMusteriEtiketleri(storage.get('etiketler', defaultEtiketler));
     
     setIsLoading(false);
     console.log('✅ Veriler localStorage\'dan yüklendi');
