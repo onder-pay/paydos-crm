@@ -210,7 +210,7 @@ function FileUpload({ label, files = [], onChange }) {
 }
 
 function FormInput({ label, ...p }) { return (<div><label style={labelStyle}>{label}</label><input {...p} style={inputStyle} /></div>); }
-function StatCard({ value, label, color }) { return (<div style={{ background: `${color}15`, border: `1px solid ${color}30`, borderRadius: '10px', padding: '14px' }}><div style={{ fontSize: '22px', fontWeight: '700', color }}>{value}</div><div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{label}</div></div>); }
+function StatCard({ value, label, color, onClick }) { return (<div onClick={onClick} style={{ background: `${color}15`, border: `1px solid ${color}30`, borderRadius: '10px', padding: '14px', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.2s ease' }} onMouseEnter={(e) => onClick && (e.currentTarget.style.transform = 'scale(1.02)', e.currentTarget.style.boxShadow = `0 4px 12px ${color}30`)} onMouseLeave={(e) => onClick && (e.currentTarget.style.transform = 'scale(1)', e.currentTarget.style.boxShadow = 'none')}><div style={{ fontSize: '22px', fontWeight: '700', color }}>{value}</div><div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{label}{onClick && <span style={{ marginLeft: '4px', fontSize: '9px' }}>📥</span>}</div></div>); }
 function Modal({ children, onClose, title }) { return (<div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '20px' }}><div style={{ background: 'linear-gradient(180deg, #0f2744 0%, #0c1929 100%)', borderRadius: '12px', width: '100%', maxWidth: '400px', maxHeight: '85vh', overflow: 'auto', border: '1px solid rgba(255,255,255,0.1)' }}><div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h3 style={{ margin: 0, fontSize: '15px', flex: 1 }}>{title}</h3><button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '6px', width: '28px', height: '28px', cursor: 'pointer', color: '#94a3b8', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button></div><div style={{ padding: '14px 16px' }}>{children}</div></div></div>); }
 function InfoBox({ label, value, highlight }) { return (<div style={{ background: highlight ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '8px', border: highlight ? '1px solid rgba(245,158,11,0.2)' : 'none' }}><p style={{ fontSize: '10px', color: highlight ? '#f59e0b' : '#64748b', marginBottom: '2px', textTransform: 'uppercase' }}>{label}</p><p style={{ fontSize: '12px', margin: 0, color: value ? (highlight ? '#f59e0b' : '#e8f1f8') : '#64748b' }}>{value || '-'}</p></div>); }
 function InfoRow({ label, value }) { return (<div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '3px 0' }}><span style={{ color: '#94a3b8' }}>{label}:</span><span style={{ color: '#e8f1f8', fontWeight: '500' }}>{value || '-'}</span></div>); }
@@ -1301,6 +1301,81 @@ function CustomerModule({ customers, setCustomers, isMobile, musteriEtiketleri }
     XLSX.writeFile(wb, `Paydos_Bitenler_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  // Schengen vizeli müşterileri Excel'e aktar
+  const exportSchengenToExcel = () => {
+    const schengenCustomers = customers.filter(c => c.schengenCountry || c.greenPassport === 'Evet');
+    if (schengenCustomers.length === 0) {
+      alert('Schengen vizeli müşteri bulunamadı!');
+      return;
+    }
+    const today = new Date();
+    const data = schengenCustomers.map(c => {
+      const daysLeft = c.schengenVisaEnd ? getDaysLeft(c.schengenVisaEnd) : null;
+      return {
+        'Ad': c.firstName,
+        'Soyad': c.lastName,
+        'Telefon': c.phone,
+        'E-posta': c.email,
+        'Şehir': c.city,
+        'Yeşil Pasaport': c.greenPassport,
+        'Schengen Ülke': c.schengenCountry || (c.greenPassport === 'Evet' ? 'Vizesiz' : '-'),
+        'Vize Başlangıç': formatDate(c.schengenVisaStart),
+        'Vize Bitiş': formatDate(c.schengenVisaEnd),
+        'Kalan Gün': c.greenPassport === 'Evet' ? '∞' : (daysLeft !== null ? daysLeft : '-'),
+        'Durum': c.greenPassport === 'Evet' ? 'Yeşil Pasaport' : (daysLeft !== null ? (daysLeft < 0 ? 'Süresi Dolmuş' : daysLeft <= 30 ? 'Kritik' : daysLeft <= 90 ? 'Yaklaşıyor' : 'Geçerli') : '-'),
+        'Pasaport No': c.passportNo,
+        'Pasaport Bitiş': formatDate(c.passportExpiry)
+      };
+    });
+    // Kalan güne göre sırala (yeşil pasaport en sona)
+    data.sort((a, b) => {
+      if (a['Kalan Gün'] === '∞') return 1;
+      if (b['Kalan Gün'] === '∞') return -1;
+      if (a['Kalan Gün'] === '-') return 1;
+      if (b['Kalan Gün'] === '-') return -1;
+      return Number(a['Kalan Gün']) - Number(b['Kalan Gün']);
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Schengen Vizeli');
+    XLSX.writeFile(wb, `Paydos_Schengen_Vizeli_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // ABD vizeli müşterileri Excel'e aktar
+  const exportUSAToExcel = () => {
+    const usaCustomers = customers.filter(c => c.usaVisa === 'Var');
+    if (usaCustomers.length === 0) {
+      alert('ABD vizeli müşteri bulunamadı!');
+      return;
+    }
+    const data = usaCustomers.map(c => {
+      const daysLeft = c.usaVisaEnd ? getDaysLeft(c.usaVisaEnd) : null;
+      return {
+        'Ad': c.firstName,
+        'Soyad': c.lastName,
+        'Telefon': c.phone,
+        'E-posta': c.email,
+        'Şehir': c.city,
+        'Vize Başlangıç': formatDate(c.usaVisaStart),
+        'Vize Bitiş': formatDate(c.usaVisaEnd),
+        'Kalan Gün': daysLeft !== null ? daysLeft : '-',
+        'Durum': daysLeft !== null ? (daysLeft < 0 ? 'Süresi Dolmuş' : daysLeft <= 90 ? 'Kritik' : daysLeft <= 180 ? 'Yaklaşıyor' : 'Geçerli') : '-',
+        'Pasaport No': c.passportNo,
+        'Pasaport Bitiş': formatDate(c.passportExpiry)
+      };
+    });
+    // Kalan güne göre sırala
+    data.sort((a, b) => {
+      if (a['Kalan Gün'] === '-') return 1;
+      if (b['Kalan Gün'] === '-') return -1;
+      return Number(a['Kalan Gün']) - Number(b['Kalan Gün']);
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'ABD Vizeli');
+    XLSX.writeFile(wb, `Paydos_ABD_Vizeli_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   const importFromExcel = (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
@@ -1344,8 +1419,8 @@ function CustomerModule({ customers, setCustomers, isMobile, musteriEtiketleri }
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '14px' }}>
         <StatCard value={customers.length} label="Toplam Müşteri" color="#3b82f6" />
         <StatCard value={customers.filter(c => isPassportExpiring(c)).length} label="Pasaport Dolacak" color="#f59e0b" />
-        <StatCard value={customers.filter(c => c.schengenCountry || c.greenPassport === 'Evet').length} label="Schengen" color="#10b981" />
-        <StatCard value={customers.filter(c => c.usaVisa === 'Var').length} label="ABD Vizeli" color="#8b5cf6" />
+        <StatCard value={customers.filter(c => c.schengenCountry || c.greenPassport === 'Evet').length} label="Schengen" color="#10b981" onClick={exportSchengenToExcel} />
+        <StatCard value={customers.filter(c => c.usaVisa === 'Var').length} label="ABD Vizeli" color="#8b5cf6" onClick={exportUSAToExcel} />
       </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
