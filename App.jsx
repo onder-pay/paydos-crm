@@ -812,6 +812,8 @@ Paydos Turizm`;
       setSyncedCustomers(customers);
       return;
     }
+    // Always backup to localStorage first
+    localStorage.setItem('paydos_customers', JSON.stringify(customers));
     // Find changes
     const syncChanges = async () => {
       try {
@@ -854,6 +856,8 @@ Paydos Turizm`;
       setSyncedVisa(visaApplications);
       return;
     }
+    // Always backup to localStorage first
+    localStorage.setItem('paydos_visa', JSON.stringify(visaApplications));
     const syncChanges = async () => {
       try {
         const newItems = visaApplications.filter(v => !syncedVisa.find(sv => sv.id === v.id));
@@ -892,6 +896,8 @@ Paydos Turizm`;
       setSyncedUsers(users);
       return;
     }
+    // Always backup to localStorage first
+    localStorage.setItem('paydos_users', JSON.stringify(users));
     const syncChanges = async () => {
       try {
         const newItems = users.filter(u => !syncedUsers.find(su => su.id === u.id));
@@ -929,6 +935,8 @@ Paydos Turizm`;
       setSyncedTours(tours);
       return;
     }
+    // Always backup to localStorage first
+    localStorage.setItem('paydos_tours', JSON.stringify(tours));
     const syncChanges = async () => {
       try {
         const newItems = tours.filter(t => !syncedTours.find(st => st.id === t.id));
@@ -966,6 +974,8 @@ Paydos Turizm`;
       setSyncedHotels(hotelReservations);
       return;
     }
+    // Always backup to localStorage first
+    localStorage.setItem('paydos_hotels', JSON.stringify(hotelReservations));
     const syncChanges = async () => {
       try {
         const newItems = hotelReservations.filter(h => !syncedHotels.find(sh => sh.id === h.id));
