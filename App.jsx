@@ -203,6 +203,7 @@ function FileUpload({ label, files = [], onChange }) {
 }
 
 function FormInput({ label, ...p }) { return (<div><label style={labelStyle}>{label}</label><input {...p} style={inputStyle} /></div>); }
+
 function StatCard({ value, label, color, onClick }) { return (<div onClick={onClick} style={{ background: `${color}15`, border: `1px solid ${color}30`, borderRadius: '10px', padding: '14px', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.2s ease' }} onMouseEnter={(e) => onClick && (e.currentTarget.style.transform = 'scale(1.02)', e.currentTarget.style.boxShadow = `0 4px 12px ${color}30`)} onMouseLeave={(e) => onClick && (e.currentTarget.style.transform = 'scale(1)', e.currentTarget.style.boxShadow = 'none')}><div style={{ fontSize: '22px', fontWeight: '700', color }}>{value}</div><div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{label}{onClick && <span style={{ marginLeft: '4px', fontSize: '9px' }}>📥</span>}</div></div>); }
 function Modal({ children, onClose, title }) { return (<div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '20px' }}><div style={{ background: 'linear-gradient(180deg, #0f2744 0%, #0c1929 100%)', borderRadius: '12px', width: '100%', maxWidth: '400px', maxHeight: '85vh', overflow: 'auto', border: '1px solid rgba(255,255,255,0.1)' }}><div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h3 style={{ margin: 0, fontSize: '15px', flex: 1 }}>{title}</h3><button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '6px', width: '28px', height: '28px', cursor: 'pointer', color: '#94a3b8', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button></div><div style={{ padding: '14px 16px' }}>{children}</div></div></div>); }
 function InfoBox({ label, value, highlight }) { return (<div style={{ background: highlight ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '8px', border: highlight ? '1px solid rgba(245,158,11,0.2)' : 'none' }}><p style={{ fontSize: '10px', color: highlight ? '#f59e0b' : '#64748b', marginBottom: '2px', textTransform: 'uppercase' }}>{label}</p><p style={{ fontSize: '12px', margin: 0, color: value ? (highlight ? '#f59e0b' : '#e8f1f8') : '#64748b' }}>{value || '-'}</p></div>); }
@@ -3045,8 +3046,8 @@ function TourModule({ tours, addTour, updateTour, deleteTour, customers, isMobil
               <FormInput label="Destinasyon *" value={formData.destination} onChange={(e) => setFormData({ ...formData, destination: e.target.value })} placeholder="örn: Yunanistan" />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '14px' }}>
-              <FormInput label="Başlangıç *" type="date" value={formData.startDate} onChange={(e) => handleDateChange('startDate', e.target.value)} />
-              <FormInput label="Bitiş *" type="date" value={formData.endDate} onChange={(e) => handleDateChange('endDate', e.target.value)} />
+              <DateInput label="Başlangıç *" value={formData.startDate} onChange={(v) => handleDateChange('startDate', v)} />
+              <DateInput label="Bitiş *" value={formData.endDate} onChange={(v) => handleDateChange('endDate', v)} />
               <FormInput label="Süre (gün)" type="number" value={formData.duration} readOnly />
               <FormInput label="Kapasite" type="number" value={formData.capacity} onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 20 })} />
             </div>
@@ -3514,8 +3515,8 @@ function HotelModule({ hotelReservations, addHotel, updateHotel, deleteHotel, cu
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                     <FormInput label="Dönem Adı" value={price.seasonName} onChange={(e) => updatePrice(price.id, 'seasonName', e.target.value)} placeholder="Yaz 2025" />
-                    <FormInput label="Başlangıç" type="date" value={price.startDate} onChange={(e) => updatePrice(price.id, 'startDate', e.target.value)} />
-                    <FormInput label="Bitiş" type="date" value={price.endDate} onChange={(e) => updatePrice(price.id, 'endDate', e.target.value)} />
+                    <DateInput label="Başlangıç" value={price.startDate} onChange={(v) => updatePrice(price.id, 'startDate', v)} />
+                    <DateInput label="Bitiş" value={price.endDate} onChange={(v) => updatePrice(price.id, 'endDate', v)} />
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '10px' }}>
                     <div>
@@ -3643,8 +3644,8 @@ function HotelModule({ hotelReservations, addHotel, updateHotel, deleteHotel, cu
 
             {/* Tarihler */}
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: '14px' }}>
-              <FormInput label="Giriş Tarihi *" type="date" value={reservationForm.checkIn} onChange={(e) => handleReservationDateChange('checkIn', e.target.value)} />
-              <FormInput label="Çıkış Tarihi *" type="date" value={reservationForm.checkOut} onChange={(e) => handleReservationDateChange('checkOut', e.target.value)} />
+              <DateInput label="Giriş Tarihi *" value={reservationForm.checkIn} onChange={(v) => handleReservationDateChange('checkIn', v)} />
+              <DateInput label="Çıkış Tarihi *" value={reservationForm.checkOut} onChange={(v) => handleReservationDateChange('checkOut', v)} />
               <FormInput label="Gece Sayısı" type="number" value={reservationForm.nights} readOnly />
             </div>
 
