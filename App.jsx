@@ -3305,12 +3305,36 @@ function HotelModule({ hotelReservations, addHotel, updateHotel, deleteHotel, cu
   };
 
   const selectHotelForReservation = (hotel) => {
+    const defaultRoomType = hotel.roomTypes?.[0] || 'Standart Oda';
+    const matchingPrice = hotel.prices?.find(p => p.roomType === defaultRoomType);
     setReservationForm({
       ...reservationForm,
       hotelId: hotel.id,
       hotelName: hotel.name,
-      roomType: hotel.roomTypes?.[0] || 'Standart Oda'
+      roomType: defaultRoomType,
+      boardType: matchingPrice?.boardType || 'BB',
+      pricePerNight: matchingPrice?.price || '',
+      currency: matchingPrice?.currency || '€'
     });
+  };
+
+  const handleRoomOrBoardChange = (field, value) => {
+    const newData = { ...reservationForm, [field]: value };
+    const hotel = hotels.find(h => h.id === newData.hotelId);
+    if (hotel?.prices) {
+      const matchingPrice = hotel.prices.find(p => 
+        p.roomType === newData.roomType && p.boardType === newData.boardType
+      );
+      if (matchingPrice) {
+        newData.pricePerNight = matchingPrice.price;
+        newData.currency = matchingPrice.currency;
+        if (newData.nights) {
+          newData.totalPrice = (parseFloat(matchingPrice.price) * newData.nights).toFixed(2);
+          newData.commissionAmount = calculateCommission(newData.totalPrice, hotel);
+        }
+      }
+    }
+    setReservationForm(newData);
   };
 
   const selectCustomerForReservation = (customer) => {
@@ -3397,6 +3421,32 @@ function HotelModule({ hotelReservations, addHotel, updateHotel, deleteHotel, cu
     );
   }
 
+  // Fiyat ekleme/silme fonksiyonları
+  const addPrice = () => {
+    const newPrice = {
+      id: Date.now(),
+      seasonName: '',
+      startDate: '',
+      endDate: '',
+      roomType: hotelForm.roomTypes?.[0] || 'Standart Oda',
+      boardType: 'BB',
+      price: '',
+      currency: '€'
+    };
+    setHotelForm({ ...hotelForm, prices: [...(hotelForm.prices || []), newPrice] });
+  };
+
+  const updatePrice = (priceId, field, value) => {
+    setHotelForm({
+      ...hotelForm,
+      prices: hotelForm.prices.map(p => p.id === priceId ? { ...p, [field]: value } : p)
+    });
+  };
+
+  const removePrice = (priceId) => {
+    setHotelForm({ ...hotelForm, prices: hotelForm.prices.filter(p => p.id !== priceId) });
+  };
+
   // Otel Düzenleme
   if (view === 'editHotel') {
     return (
@@ -3410,8 +3460,9 @@ function HotelModule({ hotelReservations, addHotel, updateHotel, deleteHotel, cu
         {saveMessage && <div style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', padding: '10px', borderRadius: '8px', marginBottom: '12px', color: '#10b981', textAlign: 'center' }}>{saveMessage}</div>}
 
         <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
+          <h3 style={{ margin: '0 0 16px', color: '#8b5cf6', fontSize: '15px' }}>🏨 Otel Bilgileri</h3>
           <div style={{ display: 'grid', gap: '14px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '14px' }}>
               <FormInput label="Otel Adı *" value={hotelForm.name} onChange={(e) => setHotelForm({ ...hotelForm, name: e.target.value })} />
               <div>
                 <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>Yıldız</label>
@@ -3420,20 +3471,10 @@ function HotelModule({ hotelReservations, addHotel, updateHotel, deleteHotel, cu
                   <option value="Butik">Butik</option>
                 </select>
               </div>
+              <FormInput label="Şehir / Ülke" value={hotelForm.city} onChange={(e) => setHotelForm({ ...hotelForm, city: e.target.value })} placeholder="Antalya, Türkiye" />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '14px' }}>
-              <FormInput label="Şehir" value={hotelForm.city} onChange={(e) => setHotelForm({ ...hotelForm, city: e.target.value })} />
-              <FormInput label="Ülke" value={hotelForm.country} onChange={(e) => setHotelForm({ ...hotelForm, country: e.target.value })} />
-            </div>
-            <FormInput label="Adres" value={hotelForm.address} onChange={(e) => setHotelForm({ ...hotelForm, address: e.target.value })} />
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '14px' }}>
-              <FormInput label="Telefon" value={hotelForm.phone} onChange={(e) => setHotelForm({ ...hotelForm, phone: e.target.value })} />
-              <FormInput label="E-posta" value={hotelForm.email} onChange={(e) => setHotelForm({ ...hotelForm, email: e.target.value })} />
-              <FormInput label="Website" value={hotelForm.website} onChange={(e) => setHotelForm({ ...hotelForm, website: e.target.value })} />
-            </div>
-            <FormInput label="Yetkili Kişi" value={hotelForm.contactPerson} onChange={(e) => setHotelForm({ ...hotelForm, contactPerson: e.target.value })} />
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '14px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>Komisyon Tipi</label>
                 <select value={hotelForm.commissionType} onChange={(e) => setHotelForm({ ...hotelForm, commissionType: e.target.value })} style={{ width: '100%', padding: '10px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#e8f1f8' }}>
@@ -3448,12 +3489,66 @@ function HotelModule({ hotelReservations, addHotel, updateHotel, deleteHotel, cu
               <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>Oda Tipleri (virgülle ayırın)</label>
               <input type="text" value={hotelForm.roomTypes?.join(', ') || ''} onChange={(e) => setHotelForm({ ...hotelForm, roomTypes: e.target.value.split(',').map(r => r.trim()).filter(r => r) })} placeholder="Standart Oda, Deluxe Oda, Suite" style={{ width: '100%', padding: '10px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#e8f1f8' }} />
             </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>Notlar</label>
-              <textarea value={hotelForm.notes} onChange={(e) => setHotelForm({ ...hotelForm, notes: e.target.value })} rows={3} style={{ width: '100%', padding: '10px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#e8f1f8', resize: 'vertical' }} />
-            </div>
           </div>
+        </div>
+
+        {/* Fiyat Yönetimi */}
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ margin: 0, color: '#10b981', fontSize: '15px' }}>💰 Fiyat Listesi</h3>
+            <button onClick={addPrice} style={{ padding: '8px 14px', background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', color: '#10b981', cursor: 'pointer', fontSize: '13px' }}>+ Fiyat Ekle</button>
+          </div>
+
+          {(!hotelForm.prices || hotelForm.prices.length === 0) ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+              <p>Henüz fiyat eklenmedi</p>
+              <p style={{ fontSize: '12px' }}>Dönem, oda tipi ve pansiyon tipine göre fiyat ekleyin</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {hotelForm.prices.map((price, idx) => (
+                <div key={price.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <span style={{ color: '#10b981', fontWeight: '600', fontSize: '13px' }}>Fiyat #{idx + 1}</span>
+                    <button onClick={() => removePrice(price.id)} style={{ background: 'rgba(239,68,68,0.2)', border: 'none', borderRadius: '6px', color: '#ef4444', padding: '4px 10px', cursor: 'pointer', fontSize: '11px' }}>Sil</button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                    <FormInput label="Dönem Adı" value={price.seasonName} onChange={(e) => updatePrice(price.id, 'seasonName', e.target.value)} placeholder="Yaz 2025" />
+                    <FormInput label="Başlangıç" type="date" value={price.startDate} onChange={(e) => updatePrice(price.id, 'startDate', e.target.value)} />
+                    <FormInput label="Bitiş" type="date" value={price.endDate} onChange={(e) => updatePrice(price.id, 'endDate', e.target.value)} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Oda Tipi</label>
+                      <select value={price.roomType} onChange={(e) => updatePrice(price.id, 'roomType', e.target.value)} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#e8f1f8', fontSize: '13px' }}>
+                        {(hotelForm.roomTypes || ['Standart Oda']).map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Pansiyon</label>
+                      <select value={price.boardType} onChange={(e) => updatePrice(price.id, 'boardType', e.target.value)} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#e8f1f8', fontSize: '13px' }}>
+                        {boardTypes.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
+                      </select>
+                    </div>
+                    <FormInput label="Gecelik Fiyat" type="number" value={price.price} onChange={(e) => updatePrice(price.id, 'price', e.target.value)} />
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Para Birimi</label>
+                      <select value={price.currency} onChange={(e) => updatePrice(price.id, 'currency', e.target.value)} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#e8f1f8', fontSize: '13px' }}>
+                        <option value="€">€ Euro</option>
+                        <option value="$">$ Dolar</option>
+                        <option value="₺">₺ TL</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>📝 Notlar</label>
+          <textarea value={hotelForm.notes} onChange={(e) => setHotelForm({ ...hotelForm, notes: e.target.value })} rows={2} placeholder="Otel hakkında notlar..." style={{ width: '100%', padding: '10px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#e8f1f8', resize: 'vertical' }} />
         </div>
 
         <button onClick={saveHotel} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', border: 'none', borderRadius: '10px', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '15px' }}>💾 Kaydet</button>
@@ -3534,13 +3629,13 @@ function HotelModule({ hotelReservations, addHotel, updateHotel, deleteHotel, cu
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '14px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>Oda Tipi</label>
-                <select value={reservationForm.roomType} onChange={(e) => setReservationForm({ ...reservationForm, roomType: e.target.value })} style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#e8f1f8' }}>
+                <select value={reservationForm.roomType} onChange={(e) => handleRoomOrBoardChange('roomType', e.target.value)} style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#e8f1f8' }}>
                   {(hotels.find(h => h.id === reservationForm.hotelId)?.roomTypes || ['Standart Oda']).map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>Pansiyon Tipi</label>
-                <select value={reservationForm.boardType} onChange={(e) => setReservationForm({ ...reservationForm, boardType: e.target.value })} style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#e8f1f8' }}>
+                <select value={reservationForm.boardType} onChange={(e) => handleRoomOrBoardChange('boardType', e.target.value)} style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#e8f1f8' }}>
                   {boardTypes.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
                 </select>
               </div>
