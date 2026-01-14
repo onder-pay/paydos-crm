@@ -337,6 +337,7 @@ export function useForm(initialValues = {}, validate = null) {
     setValue,
     setFieldError,
     setValues,
+    setErrors,
     reset,
   };
 }
